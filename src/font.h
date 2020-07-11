@@ -26,7 +26,7 @@
 #define FONT_SMALLFNT 1
 
 extern short* font_vertex_buffer;
-extern short* font_coords_buffer;
+extern float* font_coords_buffer;
 extern int font_type;
 
 extern struct list font_backed_fonts;

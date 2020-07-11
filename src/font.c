@@ -27,7 +27,7 @@
 #include "stb_truetype.h"
 
 short* font_vertex_buffer;
-short* font_coords_buffer;
+float* font_coords_buffer;
 int font_type = FONT_FIXEDSYS;
 
 struct font_backed {
@@ -43,7 +43,7 @@ struct list font_backed_fonts;
 unsigned char font_init() {
 	font_vertex_buffer = malloc(512 * 8 * sizeof(short));
 	CHECK_ALLOCATION_ERROR(font_vertex_buffer)
-	font_coords_buffer = malloc(512 * 8 * sizeof(short));
+	font_coords_buffer = malloc(512 * 8 * sizeof(float));
 	CHECK_ALLOCATION_ERROR(font_coords_buffer)
 
 	list_create(&font_backed_fonts, sizeof(struct font_backed));
@@ -73,7 +73,8 @@ static struct font_backed* font_find(float h) {
 	f.cdata = malloc(224 * sizeof(stbtt_bakedchar));
 	CHECK_ALLOCATION_ERROR(f.cdata)
 
-	void* temp_bitmap = NULL;
+	unsigned char* temp_bitmap = NULL;
+	unsigned int * temp_bitmap2 = NULL;
 
 	int max_size = 0;
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &max_size);
@@ -86,8 +87,10 @@ static struct font_backed* font_find(float h) {
 	}
 
 	while(1) {
-		temp_bitmap = realloc(temp_bitmap, f.w * f.h);
+		temp_bitmap  = realloc(temp_bitmap,  f.w * f.h);
+		temp_bitmap2 = realloc(temp_bitmap2, f.w * f.h * 4);
 		CHECK_ALLOCATION_ERROR(temp_bitmap)
+		CHECK_ALLOCATION_ERROR(temp_bitmap2)
 		int res = 0;
 		res = stbtt_BakeFontBitmap(file, 0, f.size, temp_bitmap, f.w, f.h, 31, 224, f.cdata);
 		if(res > 0 || (f.w == max_size && f.h == max_size))
@@ -98,14 +101,22 @@ static struct font_backed* font_find(float h) {
 			f.h *= 2;
 	}
 
-	log_info("font texsize: %i:%ipx [size %f] type: %i", f.w, f.h, f.size, f.type);
+	for (int y = 0; y < f.h; y++) {
+		for (int x = 0; x < f.w; x++) {
+			unsigned int value = (unsigned int)temp_bitmap[y * f.w + x];
+			temp_bitmap2[y * f.w + x] = 0x00FFFFFF | (value << 24);
+		}
+	}
+
+	log_info("font texsize: %i:%ipx [size %f] type: %i - max_size %d - file %p", f.w, f.h, f.size, f.type, max_size, file);
 
 	glGenTextures(1, &f.texture_id);
 	glBindTexture(GL_TEXTURE_2D, f.texture_id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, f.w, f.h, 0, GL_ALPHA, GL_UNSIGNED_BYTE, temp_bitmap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, f.w, f.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, temp_bitmap2);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glBindTexture(GL_TEXTURE_2D, 0);
 
+	free(temp_bitmap2);
 	free(temp_bitmap);
 	free(file);
 
@@ -155,19 +166,19 @@ void font_render(float x, float y, float h, char* text) {
 		if(*text > 31) {
 			stbtt_aligned_quad q;
 			stbtt_GetBakedQuad(font->cdata, font->w, font->h, *text - 31, &x, &y2, &q, 1);
-			font_coords_buffer[k + 0] = q.s0 * 8192.0F;
-			font_coords_buffer[k + 1] = q.t1 * 8192.0F;
-			font_coords_buffer[k + 2] = q.s1 * 8192.0F;
-			font_coords_buffer[k + 3] = q.t1 * 8192.0F;
-			font_coords_buffer[k + 4] = q.s1 * 8192.0F;
-			font_coords_buffer[k + 5] = q.t0 * 8192.0F;
+			font_coords_buffer[k + 0] = q.s0;
+			font_coords_buffer[k + 1] = q.t1;
+			font_coords_buffer[k + 2] = q.s1;
+			font_coords_buffer[k + 3] = q.t1;
+			font_coords_buffer[k + 4] = q.s1;
+			font_coords_buffer[k + 5] = q.t0;
 
-			font_coords_buffer[k + 6] = q.s0 * 8192.0F;
-			font_coords_buffer[k + 7] = q.t1 * 8192.0F;
-			font_coords_buffer[k + 8] = q.s1 * 8192.0F;
-			font_coords_buffer[k + 9] = q.t0 * 8192.0F;
-			font_coords_buffer[k + 10] = q.s0 * 8192.0F;
-			font_coords_buffer[k + 11] = q.t0 * 8192.0F;
+			font_coords_buffer[k + 6] = q.s0;
+			font_coords_buffer[k + 7] = q.t1;
+			font_coords_buffer[k + 8] = q.s1;
+			font_coords_buffer[k + 9] = q.t0;
+			font_coords_buffer[k + 10] = q.s0;
+			font_coords_buffer[k + 11] = q.t0;
 
 			font_vertex_buffer[k + 0] = q.x0;
 			font_vertex_buffer[k + 1] = -q.y1 + y;
@@ -191,7 +202,7 @@ void font_render(float x, float y, float h, char* text) {
 
 	glMatrixMode(GL_TEXTURE);
 	glLoadIdentity();
-	glScalef(1.0F / 8192.0F, 1.0F / 8192.0F, 1.0F);
+	glScalef(1.0F, 1.0F, 1.0F);
 	glMatrixMode(GL_MODELVIEW);
 
 	glEnable(GL_TEXTURE_2D);
@@ -206,7 +217,7 @@ void font_render(float x, float y, float h, char* text) {
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glVertexPointer(2, GL_SHORT, 0, font_vertex_buffer);
-	glTexCoordPointer(2, GL_SHORT, 0, font_coords_buffer);
+	glTexCoordPointer(2, GL_FLOAT, 0, font_coords_buffer);
 	glDrawArrays(GL_TRIANGLES, 0, k / 2);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 	glDisableClientState(GL_VERTEX_ARRAY);
