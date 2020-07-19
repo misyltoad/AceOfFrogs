@@ -119,12 +119,12 @@ void map_damaged_voxels_render() {
 			} else {
 				tesselator_set_color(&map_damaged_tesselator, rgba(0, 0, 0, voxel->damage * 1.9125F));
 
-				tesselator_addi_cube_face(&map_damaged_tesselator, CUBE_FACE_Z_N, voxel->x, voxel->y, voxel->z);
-				tesselator_addi_cube_face(&map_damaged_tesselator, CUBE_FACE_Z_P, voxel->x, voxel->y, voxel->z);
-				tesselator_addi_cube_face(&map_damaged_tesselator, CUBE_FACE_X_N, voxel->x, voxel->y, voxel->z);
-				tesselator_addi_cube_face(&map_damaged_tesselator, CUBE_FACE_X_P, voxel->x, voxel->y, voxel->z);
-				tesselator_addi_cube_face(&map_damaged_tesselator, CUBE_FACE_Y_P, voxel->x, voxel->y, voxel->z);
-				tesselator_addi_cube_face(&map_damaged_tesselator, CUBE_FACE_Y_N, voxel->x, voxel->y, voxel->z);
+				tesselator_addf_cube_face(&map_damaged_tesselator, CUBE_FACE_Z_N, voxel->x, voxel->y, voxel->z, 1.0F);
+				tesselator_addf_cube_face(&map_damaged_tesselator, CUBE_FACE_Z_P, voxel->x, voxel->y, voxel->z, 1.0F);
+				tesselator_addf_cube_face(&map_damaged_tesselator, CUBE_FACE_X_N, voxel->x, voxel->y, voxel->z, 1.0F);
+				tesselator_addf_cube_face(&map_damaged_tesselator, CUBE_FACE_X_P, voxel->x, voxel->y, voxel->z, 1.0F);
+				tesselator_addf_cube_face(&map_damaged_tesselator, CUBE_FACE_Y_P, voxel->x, voxel->y, voxel->z, 1.0F);
+				tesselator_addf_cube_face(&map_damaged_tesselator, CUBE_FACE_Y_N, voxel->x, voxel->y, voxel->z, 1.0F);
 			}
 		}
 	}
@@ -457,7 +457,7 @@ float map_sunblock(int x, int y, int z) {
 
 void map_init() {
 	libvxl_create(&map, 512, 512, 64, NULL, 0);
-	tesselator_create(&map_damaged_tesselator, VERTEX_INT, 0);
+	tesselator_create(&map_damaged_tesselator, VERTEX_FLOAT, 0);
 
 	for(int k = 0; k < 8; k++)
 		map_damaged_voxels[k].used = 0;

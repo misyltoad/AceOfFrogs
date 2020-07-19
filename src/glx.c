@@ -27,6 +27,7 @@
 #include "matrix.h"
 #include "texture.h"
 #include "glx.h"
+#include "em_gl_stubs.h"
 
 // for future opengl-es abstraction layer
 
@@ -35,7 +36,7 @@ int glx_version = 0;
 int glx_fog = 0;
 
 static int glx_major_ver() {
-#ifdef OPENGL_ES
+#if defined(OPENGL_ES) || defined(__EMSCRIPTEN__)
 	return 2;
 #else
 	return atoi(glGetString(GL_VERSION));
@@ -47,6 +48,10 @@ void glx_init() {
 	glx_version = glx_major_ver() >= 2;
 #else
 	glx_version = 0;
+#endif
+
+#ifdef __EMSCRIPTEN__
+	glx_version = 2;
 #endif
 }
 
@@ -78,10 +83,10 @@ int glx_shader(const char* vertex, const char* fragment) {
 }
 
 void glx_displaylist_create(struct glx_displaylist* x, bool has_color, bool has_normal) {
-	x->has_color = has_color;
-	x->has_normal = has_normal;
+	x->has_color = has_color ? 1 : 0;
+	x->has_normal = has_normal ? 1 : 0;
 
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(!glx_version || settings.force_displaylist) {
 		x->legacy = glGenLists(1);
 	} else {
@@ -93,18 +98,23 @@ void glx_displaylist_create(struct glx_displaylist* x, bool has_color, bool has_
 			glGenBuffers(1, x->modern + 2);
 	}
 #else
+	#ifdef USE_BUFFERS
 	glGenBuffers(1, x->modern + 0);
 
 	if(has_color)
 		glGenBuffers(1, x->modern + 1);
 	if(has_normal)
 		glGenBuffers(1, x->modern + 2);
+	#endif
+	x->vertices = NULL;
+	x->normal = NULL;
+	x->color = NULL;
 #endif
 	x->buffer_size = 0;
 }
 
 void glx_displaylist_destroy(struct glx_displaylist* x) {
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(!glx_version || settings.force_displaylist) {
 		glDeleteLists(x->legacy, 1);
 	} else {
@@ -116,12 +126,18 @@ void glx_displaylist_destroy(struct glx_displaylist* x) {
 			glDeleteBuffers(1, x->modern + 2);
 	}
 #else
+#ifdef USE_BUFFERS
 	glDeleteBuffers(1, x->modern + 0);
 
 	if(x->has_color)
 		glDeleteBuffers(1, x->modern + 1);
 	if(x->has_normal)
 		glDeleteBuffers(1, x->modern + 2);
+#else
+	if (x->vertices) free(x->vertices);
+	if (x->normal) free(x->normal);
+	if (x->color) free(x->color);
+#endif
 #endif
 }
 
@@ -129,7 +145,7 @@ void glx_displaylist_update(struct glx_displaylist* x, size_t size, int type, vo
 	int grow_buffer = size > x->buffer_size;
 	x->buffer_size = max(x->buffer_size, size);
 	x->size = size;
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(!glx_version || settings.force_displaylist) {
 		glEnableClientState(GL_VERTEX_ARRAY);
 		if(x->has_color)
@@ -143,7 +159,6 @@ void glx_displaylist_update(struct glx_displaylist* x, size_t size, int type, vo
 				glColorPointer(4, GL_UNSIGNED_BYTE, 0, color);
 
 			switch(type) {
-				case GLX_DISPLAYLIST_NORMAL: glVertexPointer(3, GL_SHORT, 0, vertex); break;
 				case GLX_DISPLAYLIST_POINTS:
 				case GLX_DISPLAYLIST_ENHANCED: glVertexPointer(3, GL_FLOAT, 0, vertex); break;
 			}
@@ -160,25 +175,29 @@ void glx_displaylist_update(struct glx_displaylist* x, size_t size, int type, vo
 		if(x->has_normal)
 			glDisableClientState(GL_NORMAL_ARRAY);
 	} else {
-#endif
+#endif		
+		// THIS MEMORY LEAKS
+		// FIX ME!!!!!
+
+#ifndef USE_BUFFERS
+		//if (grow_buffer)
+			x->vertices = malloc(x->size * 3 * sizeof(float));
+		memcpy(x->vertices, vertex, x->size * 3 * sizeof(float));
+
+		if (x->has_color) {
+			//if (grow_buffer)
+				x->color = malloc(x->size * 4);
+			memcpy(x->color, color, x->size * 4);
+		}
+
+		if (x->has_normal) {
+			//if (grow_buffer)
+				x->normal = malloc(x->size * 3);
+			memcpy(x->normal, normal, x->size * 3);
+		}
+#else
 		glBindBuffer(GL_ARRAY_BUFFER, x->modern[0]);
 		switch(type) {
-			case GLX_DISPLAYLIST_NORMAL:
-				if(grow_buffer) {
-					glBufferData(GL_ARRAY_BUFFER, x->size * 3 * sizeof(short), vertex, GL_DYNAMIC_DRAW);
-				} else {
-					glBufferSubData(GL_ARRAY_BUFFER, 0, x->size * 3 * sizeof(short), vertex);
-				}
-
-				if(x->has_color) {
-					glBindBuffer(GL_ARRAY_BUFFER, x->modern[1]);
-					if(grow_buffer) {
-						glBufferData(GL_ARRAY_BUFFER, x->size * 4, color, GL_DYNAMIC_DRAW);
-					} else {
-						glBufferSubData(GL_ARRAY_BUFFER, 0, x->size * 4, color);
-					}
-				}
-				break;
 			case GLX_DISPLAYLIST_POINTS:
 			case GLX_DISPLAYLIST_ENHANCED:
 				if(grow_buffer) {
@@ -206,13 +225,16 @@ void glx_displaylist_update(struct glx_displaylist* x, size_t size, int type, vo
 			}
 		}
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
-#ifndef OPENGL_ES
+#endif
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	}
 #endif
 }
 
+
+
 void glx_displaylist_draw(struct glx_displaylist* x, int type) {
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(!glx_version || settings.force_displaylist) {
 		glCallList(x->legacy);
 	} else {
@@ -221,21 +243,26 @@ void glx_displaylist_draw(struct glx_displaylist* x, int type) {
 
 		if(x->has_color) {
 			glEnableClientState(GL_COLOR_ARRAY);
+			#ifdef USE_BUFFERS
 			glBindBuffer(GL_ARRAY_BUFFER, x->modern[1]);
-			glColorPointer(4, GL_UNSIGNED_BYTE, 0, NULL);
+			#endif
+			glColorPointer(4, GL_UNSIGNED_BYTE, 0, x->color);
 		}
 
 		if(x->has_normal) {
 			glEnableClientState(GL_NORMAL_ARRAY);
+			#ifdef USE_BUFFERS
 			glBindBuffer(GL_ARRAY_BUFFER, x->modern[2]);
-			glNormalPointer(GL_BYTE, 0, NULL);
+			#endif
+			glNormalPointer(GL_BYTE, 0, x->normal);
 		}
 
+		#ifdef USE_BUFFERS
 		glBindBuffer(GL_ARRAY_BUFFER, x->modern[0]);
+		#endif
 		switch(type) {
-			case GLX_DISPLAYLIST_NORMAL: glVertexPointer(3, GL_SHORT, 0, NULL); break;
 			case GLX_DISPLAYLIST_POINTS:
-			case GLX_DISPLAYLIST_ENHANCED: glVertexPointer(3, GL_FLOAT, 0, NULL); break;
+			case GLX_DISPLAYLIST_ENHANCED: glVertexPointer(3, GL_FLOAT, 0, x->vertices); break;
 		}
 
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -243,11 +270,7 @@ void glx_displaylist_draw(struct glx_displaylist* x, int type) {
 		if(type == GLX_DISPLAYLIST_POINTS) {
 			glDrawArrays(GL_POINTS, 0, x->size);
 		} else {
-#ifdef OPENGL_ES
 			glDrawArrays(GL_TRIANGLES, 0, x->size);
-#else
-		glDrawArrays(GL_QUADS, 0, x->size);
-#endif
 		}
 
 		if(x->has_normal)
@@ -255,13 +278,13 @@ void glx_displaylist_draw(struct glx_displaylist* x, int type) {
 		if(x->has_color)
 			glDisableClientState(GL_COLOR_ARRAY);
 		glDisableClientState(GL_VERTEX_ARRAY);
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	}
 #endif
 }
 
 void glx_enable_sphericalfog() {
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(!settings.smooth_fog) {
 		glActiveTexture(GL_TEXTURE1);
 		glEnable(GL_TEXTURE_2D);
@@ -339,7 +362,7 @@ void glx_enable_sphericalfog() {
 }
 
 void glx_disable_sphericalfog() {
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(!settings.smooth_fog) {
 		glActiveTexture(GL_TEXTURE1);
 		glDisable(GL_TEXTURE_GEN_T);

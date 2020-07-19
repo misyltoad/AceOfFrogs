@@ -47,6 +47,11 @@
 #include "chunk.h"
 #include "main.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include "em_gl_stubs.h"
+#endif
+
 #ifdef OPENGL_ES
 void glColor3f(float r, float g, float b) {
 	glColor4f(r, g, b, 1.0F);
@@ -62,6 +67,12 @@ void glDepthRange(float near, float far) {
 
 void glClearDepth(float x) {
 	glClearDepthf(x);
+}
+#endif
+
+#ifdef __EMSCRIPTEN__
+void glLightf(GLenum light, GLenum name, GLfloat param) {
+	glLightfv(light, name, &param);
 }
 #endif
 
@@ -113,7 +124,7 @@ void drawScene() {
 	chunk_draw_visible();
 
 	if(settings.smooth_fog) {
-#ifdef OPENGL_ES
+#if defined(OPENGL_ES) || defined(__EMSCRIPTEN__)
 		glFogx(GL_FOG_MODE, GL_EXP2);
 #else
 		glFogi(GL_FOG_MODE, GL_EXP2);
@@ -330,7 +341,7 @@ void display() {
 					if(amount <= (is_local ? local_player_blocks : 50))
 						glColor3f(1.0F, 1.0F, 1.0F);
 
-					short vertices[72] = {cubes[amount - 1].x,	 cubes[amount - 1].y,		cubes[amount - 1].z,
+					float vertices[72] = {cubes[amount - 1].x,	 cubes[amount - 1].y,		cubes[amount - 1].z,
 										  cubes[amount - 1].x,	 cubes[amount - 1].y,		cubes[amount - 1].z + 1,
 										  cubes[amount - 1].x,	 cubes[amount - 1].y,		cubes[amount - 1].z,
 										  cubes[amount - 1].x + 1, cubes[amount - 1].y,		cubes[amount - 1].z,
@@ -357,7 +368,7 @@ void display() {
 										  cubes[amount - 1].x,	 cubes[amount - 1].y,		cubes[amount - 1].z + 1,
 										  cubes[amount - 1].x,	 cubes[amount - 1].y + 1, cubes[amount - 1].z + 1};
 					glEnableClientState(GL_VERTEX_ARRAY);
-					glVertexPointer(3, GL_SHORT, 0, vertices);
+					glVertexPointer(3, GL_FLOAT, 0, vertices);
 					glDrawArrays(GL_LINES, 0, 24);
 					glDisableClientState(GL_VERTEX_ARRAY);
 					amount--;
@@ -382,12 +393,12 @@ void display() {
 					matrix_translate(0.0F, -0.25F, 0.0F);
 					matrix_upload_p();
 					matrix_select(matrix_model);
-#ifdef OPENGL_ES
+#if 1//def OPENGL_ES
 					if(camera_mode == CAMERAMODE_FPS)
 						glx_disable_sphericalfog();
 #endif
 					player_render(&players[local_player_id], local_player_id, NULL, 1, NULL);
-#ifdef OPENGL_ES
+#if 1//def OPENGL_ES
 					if(camera_mode == CAMERAMODE_FPS)
 						glx_enable_sphericalfog();
 #endif
@@ -584,6 +595,68 @@ void on_error(int i, const char* s) {
 	getchar();
 }
 
+void loop() {
+	static double last_frame_start = 0.0F;
+	static double physics_time_fixed = 0.0F;
+	static double physics_time_fast = 0.0F;
+
+	double dt = window_time() - last_frame_start;
+	last_frame_start = window_time();
+
+	physics_time_fast += dt;
+	physics_time_fixed += dt;
+
+// these run at exactly ~60fps
+#define PHYSICS_STEP_TIME (1.0 / 60.0)
+	while(physics_time_fixed >= PHYSICS_STEP_TIME) {
+		physics_time_fixed -= PHYSICS_STEP_TIME;
+		player_update(PHYSICS_STEP_TIME, 1); // just physics tick
+		grenade_update(PHYSICS_STEP_TIME);
+	}
+
+	// these run at min. ~60fps but as fast as possible
+	double step = fmin(dt, PHYSICS_STEP_TIME);
+	while(physics_time_fast >= step) {
+		physics_time_fast -= step;
+		player_update(step, 0); // smooth orientation update
+		camera_update(step);
+		tracer_update(step);
+		particle_update(step);
+		map_collapsing_update(step);
+	}
+
+	display();
+
+	sound_update();
+	network_update();
+	window_update();
+
+	rpc_update();
+
+#ifndef __EMSCRIPTEN__
+	if(settings.vsync > 1 && (window_time() - last_frame_start) < (1.0 / settings.vsync)) {
+		double sleep_s = 1.0 / settings.vsync - (window_time() - last_frame_start);
+		struct timespec ts;
+		ts.tv_sec = (int)sleep_s;
+		ts.tv_nsec = (sleep_s - ts.tv_sec) * 1000000000.0;
+		nanosleep(&ts, NULL);
+	}
+#endif
+
+	fps = 1.0F / dt;
+}
+
+EM_JS(const char*, get_name, (), {
+  var jsString = prompt("Enter a username:", "Deuce");
+  // 'jsString.length' would return the length of the string as UTF-16
+  // units, but Emscripten C strings operate as UTF-8.
+  var lengthBytes = lengthBytesUTF8(jsString)+1;
+  var stringOnWasmHeap = _malloc(lengthBytes);
+  stringToUTF8(jsString, stringOnWasmHeap, lengthBytes);
+  return stringOnWasmHeap;
+});
+
+
 int main(int argc, char** argv) {
 	settings.opengl14 = 1;
 	settings.color_correction = 0;
@@ -591,8 +664,13 @@ int main(int argc, char** argv) {
 	settings.shadow_entities = 0;
 	settings.ambient_occlusion = 0;
 	settings.render_distance = 128.0F;
+#if 0
 	settings.window_width = 800;
 	settings.window_height = 600;
+#else
+	settings.window_width = 1280;
+	settings.window_height = 720;
+#endif
 	settings.player_arms = 0;
 	settings.fullscreen = 0;
 	settings.greedy_meshing = 0;
@@ -600,11 +678,12 @@ int main(int argc, char** argv) {
 	settings.show_news = 1;
 	settings.show_fps = 0;
 	settings.volume = 10;
-	settings.voxlap_models = 0;
+	settings.voxlap_models = 1;
 	settings.force_displaylist = 0;
 	settings.invert_y = 0;
 	settings.smooth_fog = 0;
-	strcpy(settings.name, "DEV_CLIENT");
+	const char* user_name = get_name();
+	strcpy(settings.name, user_name);
 
 #ifdef USE_TOUCH
 	mkdir("/sdcard/BetterSpades");
@@ -632,7 +711,7 @@ int main(int argc, char** argv) {
 
 	window_init();
 
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 	if(glewInit())
 		log_error("Could not load extended OpenGL functions!");
 #endif
@@ -657,6 +736,7 @@ int main(int argc, char** argv) {
 	if(settings.vsync > 1)
 		window_swapping(0);
 
+#ifndef __EMSCRIPTEN__
 	if(argc > 1) {
 		if(!strcmp(argv[1], "--help")) {
 			log_info("Usage: client                     [server browser]");
@@ -673,52 +753,19 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	double last_frame_start = 0.0F;
-	double physics_time_fixed = 0.0F;
-	double physics_time_fast = 0.0F;
-
-	while(!window_closed()) {
-		double dt = window_time() - last_frame_start;
-		last_frame_start = window_time();
-
-		physics_time_fast += dt;
-		physics_time_fixed += dt;
-
-// these run at exactly ~60fps
-#define PHYSICS_STEP_TIME (1.0 / 60.0)
-		while(physics_time_fixed >= PHYSICS_STEP_TIME) {
-			physics_time_fixed -= PHYSICS_STEP_TIME;
-			player_update(PHYSICS_STEP_TIME, 1); // just physics tick
-			grenade_update(PHYSICS_STEP_TIME);
-		}
-
-		// these run at min. ~60fps but as fast as possible
-		double step = fmin(dt, PHYSICS_STEP_TIME);
-		while(physics_time_fast >= step) {
-			physics_time_fast -= step;
-			player_update(step, 0); // smooth orientation update
-			camera_update(step);
-			tracer_update(step);
-			particle_update(step);
-			map_collapsing_update(step);
-		}
-
-		display();
-
-		sound_update();
-		network_update();
-		window_update();
-
-		rpc_update();
-
-		if(settings.vsync > 1 && (window_time() - last_frame_start) < (1.0 / settings.vsync)) {
-			double sleep_s = 1.0 / settings.vsync - (window_time() - last_frame_start);
-			struct timespec ts;
-			ts.tv_sec = (int)sleep_s;
-			ts.tv_nsec = (sleep_s - ts.tv_sec) * 1000000000.0;
-			nanosleep(&ts, NULL);
-		}
-
-		fps = 1.0F / dt;
+	while(!window_closed())
+		loop();
+#else
+	if(!network_connect_string("aos://907874134:32887")) {
+		log_error("Error: Connection failed (use --help for instructions)");
+		exit(1);
+	} else {
+		log_info("Connection to froggi.es successful");
+		hud_change(&hud_ingame);
 	}
+
+	//emscripten_set_main_loop(loop, 0, 1);
+	while(!window_closed())
+		loop();
+#endif
 }

@@ -13,6 +13,11 @@ option(ENABLE_GLFW "Build against GLFW3 backend" ON)
 option(ENABLE_SOUND "Enable sound support using OpenAL" ON)
 option(ENABLE_RPC "Enable Discord Rich Presence support" OFF)
 
+if(EMSCRIPTEN)
+	set(ENABLE_OPENGLES ON CACHE BOOL "Build for OpenGL ES" FORCE)
+	set(ENABLE_GLFW OFF CACHE BOOL "Build against GLFW3 backend" FORCE)
+	set(ENABLE_SDL ON CACHE BOOL "Build against SDL backend" FORCE)
+endif()
 
 if((ENABLE_ANDROID_FILE OR ENABLE_TOUCH OR ENABLE_OPENGLES) AND NOT ENABLE_SDL)
 	message(FATAL_ERROR "Enable SDL to use ENABLE_ANDROID_FILE, ENABLE_TOUCH or ENABLE_OPENGLES")

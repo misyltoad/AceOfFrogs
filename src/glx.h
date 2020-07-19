@@ -22,6 +22,8 @@
 #ifndef GLX_H
 #define GLX_H
 
+//#define USE_BUFFERS
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -29,6 +31,10 @@ extern int glx_version;
 extern int glx_fog;
 
 struct glx_displaylist {
+	void* vertices;
+	void* normal;
+	void* color;
+
 	uint32_t legacy;
 	uint32_t modern[3];
 	size_t size;
@@ -38,7 +44,6 @@ struct glx_displaylist {
 };
 
 enum {
-	GLX_DISPLAYLIST_NORMAL,
 	GLX_DISPLAYLIST_ENHANCED,
 	GLX_DISPLAYLIST_POINTS,
 };

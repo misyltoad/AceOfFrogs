@@ -66,7 +66,7 @@ static void config_setf(const char* section, const char* name, float value) {
 void config_save() {
 	kv6_rebuild_complete();
 
-	config_sets("client", "name", settings.name);
+	//config_sets("client", "name", settings.name);
 	config_seti("client", "xres", settings.window_width);
 	config_seti("client", "yres", settings.window_height);
 	config_seti("client", "windowed", !settings.fullscreen);
@@ -115,9 +115,9 @@ static int config_read_key(void* user, const char* section, const char* name, co
 	list_add(&config_file, &e);
 
 	if(!strcmp(section, "client")) {
-		if(!strcmp(name, "name")) {
-			strcpy(settings.name, value);
-		}
+		//if(!strcmp(name, "name")) {
+		//	strcpy(settings.name, value);
+		//}
 		if(!strcmp(name, "xres")) {
 			settings.window_width = atoi(value);
 		}
@@ -335,14 +335,14 @@ void config_reload() {
 	else
 		list_clear(&config_settings);
 
-	list_add(&config_settings,
+	/*list_add(&config_settings,
 			 &(struct config_setting) {
 				 .value = settings_tmp.name,
 				 .type = CONFIG_TYPE_STRING,
 				 .max = sizeof(settings.name) - 1,
 				 .name = "Name",
 				 .help = "Ingame player name",
-			 });
+			 });*/
 	list_add(&config_settings,
 			 &(struct config_setting) {
 				 .value = &settings_tmp.mouse_sensitivity,

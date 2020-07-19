@@ -240,6 +240,64 @@ const char* window_clipboard() {
 int window_key_translate(int key, int dir) {
 	if(key == SDLK_AC_BACK && !dir)
 		return WINDOW_KEY_ESCAPE;
+
+#ifdef __EMSCRIPTEN__
+	if (key == SDLK_w) return WINDOW_KEY_UP;
+	if (key == SDLK_a) return WINDOW_KEY_LEFT;
+	if (key == SDLK_s) return WINDOW_KEY_DOWN;
+	if (key == SDLK_d) return WINDOW_KEY_RIGHT;
+
+	if (key == SDLK_v) return WINDOW_KEY_SNEAK;
+	if (key == SDLK_c) return WINDOW_KEY_CROUCH;
+
+	if (key == SDLK_SPACE) return WINDOW_KEY_SPACE;
+
+	if (key == SDLK_UP) return WINDOW_KEY_CURSOR_UP;
+	if (key == SDLK_DOWN) return WINDOW_KEY_CURSOR_DOWN;
+	if (key == SDLK_LEFT) return WINDOW_KEY_CURSOR_LEFT;
+	if (key == SDLK_RIGHT) return WINDOW_KEY_CURSOR_RIGHT;
+
+	if (key == SDLK_TAB) return WINDOW_KEY_TAB;
+
+	if (key == SDLK_ESCAPE) return WINDOW_KEY_ESCAPE;
+
+	if (key == SDLK_r) return WINDOW_KEY_RELOAD;
+
+	if (key == SDLK_1) return WINDOW_KEY_TOOL1;
+	if (key == SDLK_2) return WINDOW_KEY_TOOL2;
+	if (key == SDLK_3) return WINDOW_KEY_TOOL3;
+	if (key == SDLK_4) return WINDOW_KEY_TOOL4;
+
+	if (key == SDLK_e) return WINDOW_KEY_PICKCOLOR;
+
+	if (key == SDLK_t) return WINDOW_KEY_CHAT;
+
+	if (key == SDLK_F1) return WINDOW_KEY_F1;
+	if (key == SDLK_F2) return WINDOW_KEY_F2;
+	if (key == SDLK_F3) return WINDOW_KEY_F3;
+	if (key == SDLK_F4) return WINDOW_KEY_F4;
+	if (key == SDLK_F12) return WINDOW_KEY_NETWORKSTATS;
+
+	if (key == SDLK_PERIOD) return WINDOW_KEY_CHANGETEAM;
+	if (key == SDLK_COMMA) return WINDOW_KEY_CHANGEWEAPON;
+
+	if (key == SDLK_RETURN || key == SDLK_KP_ENTER) return WINDOW_KEY_ENTER;
+	if (key == SDLK_BACKSPACE) return WINDOW_KEY_BACKSPACE;
+
+	if (key == SDLK_q) return WINDOW_KEY_LASTTOOL;
+	if (key == SDLK_F11) return WINDOW_KEY_HIDEHUD;
+	if (key == SDLK_F10) return WINDOW_KEY_COMMAND;
+	if (key == SDLK_F10) return WINDOW_KEY_SCREENSHOT;
+
+	if (key == SDLK_m) return WINDOW_KEY_MAP;
+
+	if (key == SDLK_v) return WINDOW_KEY_V;
+	if (key == SDLK_y) return WINDOW_KEY_YES;
+	if (key == SDLK_n) return WINDOW_KEY_NO;
+
+	return -1;
+#endif
+
 	return config_key_translate(key, dir);
 }
 
@@ -273,7 +331,9 @@ void window_mouseloc(double* x, double* y) {
 }
 
 void window_swapping(int value) {
+#ifndef __EMSCRIPTEN__
 	SDL_GL_SetSwapInterval(value);
+#endif
 }
 
 static struct window_finger fingers[8];
@@ -282,16 +342,29 @@ void window_init() {
 	static struct window_instance i;
 	hud_window = &i;
 
+#ifndef __EMSCRIPTEN__
 	SDL_SetHintWithPriority(SDL_HINT_ANDROID_SEPARATE_MOUSE_AND_TOUCH, "1", SDL_HINT_OVERRIDE);
+#endif
 
 	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER);
 
+#ifndef __EMSCRIPTEN__
 	hud_window->impl
 		= SDL_CreateWindow("BetterSpades " BETTERSPADES_VERSION, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 						   settings.window_width, settings.window_height, SDL_WINDOW_OPENGL);
+#else
+	hud_window->impl
+		= SDL_CreateWindow("Ace of Frogs", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+						   settings.window_width, settings.window_height, SDL_WINDOW_OPENGL);
+#endif
 
+#ifdef __EMSCRIPTEN__
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#endif
 	SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
@@ -301,6 +374,8 @@ void window_init() {
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #endif
 	SDL_GLContext* ctx = SDL_GL_CreateContext(hud_window->impl);
+	if (!ctx)
+		log_fatal("Failed to create EGL context: %s", SDL_GetError());
 
 	memset(fingers, 0, sizeof(fingers));
 }
@@ -432,6 +507,7 @@ int window_closed() {
 }
 
 void window_title(char* suffix) {
+#if 0
 	if(suffix) {
 		char title[128];
 		snprintf(title, sizeof(title) - 1, "BetterSpades %s - %s", BETTERSPADES_VERSION, suffix);
@@ -439,6 +515,7 @@ void window_title(char* suffix) {
 	} else {
 		SDL_SetWindowTitle(hud_window->impl, "BetterSpades " BETTERSPADES_VERSION);
 	}
+#endif
 }
 
 #endif

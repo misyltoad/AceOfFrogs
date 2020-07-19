@@ -32,6 +32,7 @@
 #include "model.h"
 #include "model_normals.h"
 #include "texture.h"
+#include "em_gl_stubs.h"
 
 struct kv6_t model_playerdead;
 struct kv6_t model_playerhead;
@@ -255,7 +256,7 @@ void kv6_render(struct kv6_t* kv6, unsigned char team) {
 		return;
 	if(team == TEAM_SPECTATOR)
 		team = 2;
-	if(!settings.voxlap_models) {
+	if (!settings.voxlap_models) {
 		if(!kv6->has_display_list) {
 			struct tesselator tess_color;
 			tesselator_create(&tess_color, VERTEX_FLOAT, 1);
@@ -335,7 +336,7 @@ void kv6_render(struct kv6_t* kv6, unsigned char team) {
 			glEnable(GL_LIGHTING);
 			glEnable(GL_LIGHT0);
 			glEnable(GL_COLOR_MATERIAL);
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 			glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
 #endif
 			glEnable(GL_NORMALIZE);
@@ -467,12 +468,14 @@ void kv6_render(struct kv6_t* kv6, unsigned char team) {
 		if(!glx_version)
 #endif
 		{
+#if !defined(__EMSCRIPTEN__)
 			glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, (float[]) {0.0F, 0.0F, 1.0F});
+#endif
 			glPointSize(1.414F * near_plane_height * kv6->scale * (len_x + len_y + len_z) / 3.0F);
 			glEnable(GL_LIGHTING);
 			glEnable(GL_LIGHT0);
 			glEnable(GL_COLOR_MATERIAL);
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 			glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
 #endif
 			glEnable(GL_NORMALIZE);
@@ -480,7 +483,9 @@ void kv6_render(struct kv6_t* kv6, unsigned char team) {
 
 #ifndef OPENGL_ES
 		if(glx_version) {
+			#ifndef __EMSCRIPTEN__
 			glEnable(GL_PROGRAM_POINT_SIZE);
+			#endif
 			glUseProgram(kv6_program);
 			glUniform1f(glGetUniformLocation(kv6_program, "dist_factor"),
 						glx_fog ? 1.0F / settings.render_distance : 0.0F);
@@ -516,7 +521,9 @@ void kv6_render(struct kv6_t* kv6, unsigned char team) {
 #ifndef OPENGL_ES
 		if(glx_version) {
 			glUseProgram(0);
+			#ifndef __EMSCRIPTEN__
 			glDisable(GL_PROGRAM_POINT_SIZE);
+			#endif
 		}
 #endif
 

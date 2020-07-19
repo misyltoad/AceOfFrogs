@@ -20,6 +20,9 @@
 #include <enet/enet.h>
 #include <math.h>
 #include <string.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 #include "libdeflate.h"
 #include "texture.h"
@@ -830,6 +833,9 @@ void read_PacketVersionGet(void* data, int len) {
 	ver.major = BETTERSPADES_MAJOR;
 	ver.minor = BETTERSPADES_MINOR;
 	ver.revision = BETTERSPADES_PATCH;
+#ifdef __EMSCRIPTEN__
+	char* os = "BetterSpades (Emscripten) " GIT_COMMIT_HASH;
+#else
 #ifndef OPENGL_ES
 #ifdef OS_WINDOWS
 	char* os = "BetterSpades (Windows) " GIT_COMMIT_HASH;
@@ -845,6 +851,7 @@ void read_PacketVersionGet(void* data, int len) {
 	char* os = "BetterSpades (Android) " GIT_COMMIT_HASH;
 #else
 	char* os = "BetterSpades (Embedded) " GIT_COMMIT_HASH;
+#endif
 #endif
 #endif
 	strcpy(ver.operatingsystem, os);
@@ -935,19 +942,29 @@ int network_connect_sub(char* ip, int port, int version) {
 	memset(network_stats, 0, sizeof(struct network_stat) * 40);
 	if(peer == NULL)
 		return 0;
-	if(enet_host_service(client, &event, 2500) > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
+
+	while (enet_host_service(client, &event, 250) <= 0)
+	{
+		#ifdef __EMSCRIPTEN__
+		emscripten_sleep(250);
+		#endif
+	}
+
+	if(event.type == ENET_EVENT_TYPE_CONNECT) {
 		network_received_packets = 0;
 		network_connected = 1;
 
 		float start = window_time();
 		while(window_time() - start < 1.0F) { // listen connection for 1s, check if server disconnects
 			if(!network_update()) {
+				log_error("Server disconnected from us!");
 				enet_peer_reset(peer);
 				return 0;
 			}
 		}
 		return 1;
 	}
+	log_error("No response from server...");
 	chat_showpopup("No response", 3.0F, rgb(255, 0, 0));
 	enet_peer_reset(peer);
 	return 0;

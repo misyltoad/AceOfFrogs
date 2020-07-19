@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Ace of Frogs</title>
+    <style>
+      html, body
+      {
+        padding: 0;
+        margin: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #111;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      canvas
+      {
+        image-rendering: optimizeSpeed;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: optimize-contrast;
+        image-rendering: pixelated;
+        -ms-interpolation-mode: nearest-neighbor;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    <script type='text/javascript'>
+      var Module = {
+        preRun: [],
+        postRun: [],
+        print: function(text) {
+          if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+          console.log(text);
+        },
+        printErr: function(text) {
+          if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+          console.error(text);
+        },
+        canvas: (function() {
+          var canvas = document.getElementById('canvas');
+
+          canvas.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+
+          return canvas;
+        })(),
+        setStatus: function(text) { update_size() },
+        totalDependencies: 0,
+        monitorRunDependencies: function(left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+        }
+      };
+      Module.setStatus('Downloading...');
+      window.onerror = function() {
+        Module.setStatus('Exception thrown, see JavaScript console');
+        spinnerElement.style.display = 'none';
+        Module.setStatus = function(text) {
+          if (text) Module.printErr('[post-exception status] ' + text);
+        };
+      };
+
+      function update_size() {
+        var canvas = document.getElementById("canvas");
+        var scaleFactor = Math.min(Math.floor((window.innerWidth + 1) / 1280), Math.floor((window.innerHeight + 1) / 720))
+        canvas.style.width  = 1280 * scaleFactor + "px"
+        canvas.style.height = 720 * scaleFactor + "px"
+      }
+
+      window.onresize = update_size;
+      document.addEventListener("DOMContentLoaded", function(event) {
+        update_size()
+      })
+
+      window.onbeforeunload = function (e) {
+          // Cancel the event
+          e.preventDefault();
+
+          // Chrome requires returnValue to be set
+          e.returnValue = 'Really want to quit the game?';
+      };
+
+      //Prevent Ctrl+S (and Ctrl+W for old browsers and Edge)
+      document.onkeydown = function (e) {
+          e = e || window.event;//Get event
+
+          if (!e.ctrlKey) return;
+
+          var code = e.which || e.keyCode;//Get key code
+
+          switch (code) {
+              case 83://Block Ctrl+S
+              case 87://Block Ctrl+W -- Not work in Chrome and new Firefox
+                  e.preventDefault();
+                  e.stopPropagation();
+                  break;
+          }
+      };
+    </script>
+    {{{ SCRIPT }}}
+  </body>
+</html>
+
+

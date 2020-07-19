@@ -20,12 +20,13 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#ifndef OPENGL_ES
+#if !defined(OPENGL_ES) && !defined(__EMSCRIPTEN__)
 #define GLEW_STATIC
 #include <GL/glew.h>
 #else
 #ifdef USE_SDL
 #include <SDL2/SDL_opengles.h>
+#include <SDL2/SDL_opengles2.h>
 #endif
 void glColor3f(float r, float g, float b);
 void glColor3ub(unsigned char r, unsigned char g, unsigned char b);

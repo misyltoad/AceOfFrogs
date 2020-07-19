@@ -490,7 +490,7 @@ static void hud_ingame_render(float scalex, float scalef) {
 		font_select(FONT_SMALLFNT);
 		glColor3f(1.0F, 1.0F, 0.0F);
 		font_render(0.0F, 8.0F * scalef, 8.0F * scalef,
-					"Created by ByteBit, visit https://github.com/xtreme8000/BetterSpades");
+					"Frog me up! Frog me up inside!");
 		font_select(FONT_FIXEDSYS);
 	} else {
 		if(window_key_down(WINDOW_KEY_HIDEHUD))

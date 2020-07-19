@@ -24,14 +24,9 @@
 
 #include "glx.h"
 
-#ifdef OPENGL_ES
 #define TESSELATE_TRIANGLES
-#else
-#define TESSELATE_QUADS
-#endif
 
 enum tesselator_vertex_type {
-	VERTEX_INT,
 	VERTEX_FLOAT,
 };
 
@@ -63,11 +58,8 @@ void tesselator_draw(struct tesselator* t, int with_color);
 void tesselator_glx(struct tesselator* t, struct glx_displaylist* x);
 void tesselator_set_color(struct tesselator* t, uint32_t color);
 void tesselator_set_normal(struct tesselator* t, int8_t x, int8_t y, int8_t z);
-void tesselator_addi(struct tesselator* t, int16_t* coords, uint32_t* colors, int8_t* normals);
 void tesselator_addf(struct tesselator* t, float* coords, uint32_t* colors, int8_t* normals);
-void tesselator_addi_simple(struct tesselator* t, int16_t* coords);
 void tesselator_addf_simple(struct tesselator* t, float* coords);
-void tesselator_addi_cube_face(struct tesselator* t, enum tesselator_cube_face face, int16_t x, int16_t y, int16_t z);
 void tesselator_addf_cube_face(struct tesselator* t, enum tesselator_cube_face face, float x, float y, float z,
 							   float sz);
 
